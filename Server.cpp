@@ -1,18 +1,34 @@
 #include <iostream>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <unistd.h>
+
+#ifdef _WIN32
+    #include <winsock.h> 
+    
+#else 
+    #include <sys/socket.h>
+    #include <netinet/in.h>
+    #include <unistd.h>
+#endif
+
+
 
 int main()
 {
+    // length of input
     char buffer[1024] = { 0 };
-    int new_socket = 0;
-    char* hello = "Hello from server";
+    // 
+    int accept_socket = 0;
+    const char* hello = "Hello from server";
+
+    #ifdef _WIN32
+    WSADATA wsaData;
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
+        std::cerr << "WSAStartup failed\n";
+        return 1;
+    }
+    #endif
 
     // creating end-point server socket. 
     int mySocket = socket(AF_INET, SOCK_STREAM, 0);
-    
-
     if(mySocket < 0)
     {
         std::cout << "Failed to init a endpoint SOCKET" << std::endl;
@@ -36,22 +52,36 @@ int main()
     {
         std::cout << "Error occured on Listen";
     }
-    // 
-    socklen_t addrlen = sizeof(serv_addr);
-    new_socket = accept(mySocket, (struct sockaddr*)&serv_addr, &addrlen);
-    if(new_socket < 0)
+
+    //socklen_t addrlen = sizeof(serv_addr);
+    int addrlen = sizeof(serv_addr);
+    accept_socket = accept(mySocket, (struct sockaddr*)&serv_addr, &addrlen);
+    if(accept_socket < 0)
     {
         std::cout << "failed to Accept" << std::endl;
     }
 
     ssize_t valread;
 
-    valread = read(new_socket, buffer, 1024 - 1);
+    #ifdef _WIN32
+    valread = recv(accept_socket, buffer, 1024 - 1, 0);
+    #else
+    valread = read(accept_socket, buffer, 1024 - 1);
+    #endif
 
     std:: cout << "Message: " << buffer << std::endl;
 
-    send(new_socket, hello, strlen(hello), 0);
+    #ifdef _WIN32
+    send(accept_socket, hello, strlen(hello), 0);
+    #else
+    write(accept_socket, hello, strlen(hello));
+    #endif
 
+    // Close the socket
+    #ifdef _WIN32
+    closesocket(mySocket);
+    #else
     close(mySocket);
+    #endif
     return 0;
 }
